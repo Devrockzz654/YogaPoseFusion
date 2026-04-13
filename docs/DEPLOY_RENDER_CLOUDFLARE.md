@@ -26,13 +26,20 @@ This repo includes [render.yaml](/Volumes/Dev/Project2/YogaPoseFusion/render.yam
 3. Render will detect `render.yaml`.
 4. Create the service.
 
+### Backend dependency files
+
+- Local development: `backend/requirements.txt`
+- Render deployment: `backend/requirements-render.txt`
+
+The Render file is pinned more tightly for Linux compatibility and stable deploys.
+
 ### Option B: Manual Web Service
 
 If you prefer manual setup, use:
 
 - Root directory: `backend`
 - Environment: `Python`
-- Build command: `pip install -r requirements.txt`
+- Build command: `pip install -r requirements-render.txt`
 - Start command: `uvicorn inference:app --host 0.0.0.0 --port $PORT`
 
 ### Notes

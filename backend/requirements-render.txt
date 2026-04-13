@@ -1,12 +1,13 @@
 fastapi
 uvicorn[standard]
-numpy
+numpy==1.26.4
 torch
-mediapipe
+mediapipe==0.10.21
 pillow
 joblib
 networkx
 scipy
-scikit-learn
+scikit-learn==1.7.2
+protobuf==4.25.8
 python-multipart
 openai>=1.0.0
