@@ -7,6 +7,6 @@ pillow
 joblib
 networkx
 scipy
-scikit-learn
+scikit-learn==1.7.2
 python-multipart
 openai>=1.0.0
