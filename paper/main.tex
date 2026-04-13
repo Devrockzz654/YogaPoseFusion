@@ -1,0 +1,450 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{array}
+
+\begin{document}
+
+\title{YogaPoseFusion: Real-Time Yoga Pose Classification and Corrective Coaching via Keypoint-Spectral Fusion}
+
+\author{
+\IEEEauthorblockN{Mrs. G.V. Gayathri\textsuperscript{0}, Sudeb Kumar Mandal\textsuperscript{1}, K. Premchand\textsuperscript{2}, T. Meenakshi\textsuperscript{3}, K. Pranay\textsuperscript{4}, L. Indu\textsuperscript{5}}
+\IEEEauthorblockA{
+\textsuperscript{0,1,2,3,4,5}Department of Computer Science Engineering with Data Science (CSD),\\
+Anil Neerukonda Institute of Technology and Sciences, Visakhapatnam, India\\
+\textsuperscript{1}sudebkumar2378@gmail.com, \textsuperscript{2}kovvali.premchand@gmail.com,\\
+\textsuperscript{3}meenakshithorati04@gmail.com, \textsuperscript{4}sunnypranay999@gmail.com,\\
+\textsuperscript{5}Laguduindu261@gmail.com}
+}
+
+\maketitle
+
+\begin{abstract}
+Real-time yoga coaching systems often fail in practical settings due to unstable frame-wise predictions and noisy corrective feedback. This work addresses that problem through YogaPoseFusion, a pipeline that fuses MediaPipe/BlazePose keypoints with graph-spectral pose descriptors and deploys a five-model residual MLP ensemble for robust 82-class inference. The proposed system was implemented as a FastAPI service with temporal stabilization (EMA smoothing, majority voting, confidence gating, and persistence filtering) and evaluated on Yoga-82 with repository-verified splits (10{,}219 train, 2{,}898 validation, 1{,}556 test). The ensemble achieved 81.88\% test accuracy and 79.93 macro-F1, outperforming a single-fold checkpoint (80.91\% and 79.30). In a 1{,}290-frame real session, the system reported 198.96 ms average latency (about 5.03 FPS), 3.66 false alerts/min, and 9.725 s average time-to-correct. These results show that lightweight fusion and temporal controls can produce more precise and clinically usable coaching signals in webcam-based yoga practice.
+\end{abstract}
+
+\begin{IEEEkeywords}
+yoga pose recognition, human pose estimation, real-time feedback, feature fusion, graph spectral features
+\end{IEEEkeywords}
+
+\section{Introduction}
+\textbf{Problem:} AI-supported yoga coaching must classify fine-grained poses and deliver precise correction cues in real time. In practice, many systems are accurate on static images but unstable in live streams due to frame noise, occlusion, and confidence fluctuations.
+
+\textbf{Why it matters:} Yoga posture errors can lead to ineffective practice or injury risk. A useful coaching model must therefore provide both (i) reliable pose recognition and (ii) stable, interpretable feedback that users can act on immediately.
+
+\textbf{Application context:} This problem is most critical in webcam/mobile self-practice, remote rehabilitation, and at-home fitness, where instructors are absent and real-time guidance is required.
+
+\textbf{Our response:} YogaPoseFusion is designed as an end-to-end classification-plus-coaching pipeline for this setting. The main contributions are:
+\begin{enumerate}
+\item A lightweight fusion representation that combines 33-point body landmarks with graph spectral descriptors.
+\item A real-time stabilization stack (EMA feature smoothing, temporal majority voting, confidence gating, and issue persistence filtering).
+\item A deployable API pipeline with measurable coaching metrics (latency, false-alert rate, time-to-correct) tied to session logs.
+\end{enumerate}
+
+The system is built for 82-way yoga pose classification using Yoga-82 \cite{verma2020yoga82}, with MediaPipe/BlazePose for keypoint extraction \cite{lugaresi2019mediapipe,bazarevsky2020blazepose}.
+
+\section{Related Work (Literature Review)}
+This section summarizes representative work in chronological order (2014--2023), aligning with the review style in Figured planning notes.
+
+\textbf{Early deep pose estimation (2014--2018):} DeepPose \cite{toshev2014deeppose} initiated direct regression for human joints. OpenPose \cite{cao2017realtime} enabled real-time multi-person keypoint extraction with part affinity fields. RMPE \cite{fang2017rmpe} improved multi-person robustness under imperfect detections. Simple Baselines \cite{xiao2018simple} showed strong top-down performance with minimal architectural complexity.
+
+\textbf{Accuracy-oriented pose backbones (2019--2020):} High-Resolution Networks (HRNet) \cite{sun2019hrnet} preserved fine spatial details and became a key reference for high-quality landmarks. PifPaf \cite{kreiss2019pifpaf} focused on bottom-up precision under crowded scenes. MediaPipe \cite{lugaresi2019mediapipe} and BlazePose \cite{bazarevsky2020blazepose} shifted the field toward practical on-device real-time pipelines.
+
+\textbf{Domain and toolkit maturation (2020--2023):} Yoga-82 \cite{verma2020yoga82} introduced fine-grained yoga classification at scale, exposing strong inter-class similarity and class imbalance. MMPose \cite{cai2020mmpose} consolidated reproducible pose-estimation pipelines and benchmarks. RTMPose \cite{jiang2023rtmpose} emphasized efficient, real-time accuracy trade-offs useful for deployment.
+
+\textbf{Optimization practices used in this work:} Residual learning \cite{he2016resnet}, label smoothing \cite{szegedy2016inception}, AdamW \cite{loshchilov2017decoupled}, and cosine warm restarts \cite{loshchilov2016sgdr} provide the optimization foundation for our classifier.
+
+Compared with prior systems that emphasize either offline accuracy or raw landmark detection, YogaPoseFusion targets the combined requirement of \emph{classification accuracy + stable corrective feedback} for live yoga coaching.
+
+\section{Proposed Methodology}
+\subsection{Problem Formulation}
+Let $x_t$ denote an RGB frame at time $t$. The system learns a mapping
+\begin{equation}
+\mathcal{F}: x_t \rightarrow (\hat{c}_t, \hat{q}_t, \hat{u}_t),
+\end{equation}
+where $\hat{c}_t$ is the predicted pose class, $\hat{q}_t$ is confidence, and $\hat{u}_t$ is a structured feedback set (issues, target ranges, and correction messages). Unlike offline pose classifiers, the objective here is dual: maximize class-level recognition quality while minimizing unstable corrective outputs over time.
+
+\subsection{Pipeline Overview}
+Given an RGB frame, the system extracts 33 pose landmarks
+\begin{equation}
+L_t = \{(x_i, y_i, z_i, v_i)\}_{i=1}^{33},
+\end{equation}
+where $v_i$ is landmark visibility. These are converted to:
+\begin{itemize}
+\item keypoint vector $k_t \in \mathbb{R}^{132}$ (flattened $33 \times 4$),
+\item spectral vector $s_t \in \mathbb{R}^{5}$ from a weighted anatomical graph.
+\end{itemize}
+
+The fused feature is:
+\begin{equation}
+f_t = [k_t ; s_t] \in \mathbb{R}^{137}.
+\end{equation}
+
+\subsection{Module-Wise Workflow}
+The full method can be viewed as four modules:
+\begin{enumerate}
+\item \textbf{Pose Sensing:} frame acquisition and 33-point landmark extraction.
+\item \textbf{Feature Fusion:} keypoint flattening plus graph-spectral descriptor computation.
+\item \textbf{Pose Inference:} residual MLP classification with five-fold ensemble averaging.
+\item \textbf{Coaching Engine:} confidence gating, temporal stabilization, and pose-aware corrective messaging.
+\end{enumerate}
+
+\subsection{Graph-Spectral Feature Construction}
+We define a fixed pose graph with 33 nodes and 18 anatomical edges. Edge weight is inverse Euclidean distance:
+\begin{equation}
+w_{ij} = \frac{1}{\|p_i - p_j\|_2 + \epsilon}.
+\end{equation}
+From the weighted Laplacian $L_g$, we compute the six smallest eigenvalues and keep the top five non-zero sorted values as $s_t$.
+
+\subsection{Classifier and Ensemble}
+The classifier is a residual MLP:
+\begin{itemize}
+\item FC(137$\rightarrow$1024) + BN + ReLU + Dropout(0.4) + Residual block,
+\item FC(1024$\rightarrow$512) + BN + ReLU + Dropout(0.4) + Residual block,
+\item FC(512$\rightarrow$256) + BN + ReLU + Dropout(0.3),
+\item FC(256$\rightarrow$82).
+\end{itemize}
+
+For deployment, we load five fold checkpoints and average logits:
+\begin{equation}
+\hat{y}_t = \arg\max \; \text{softmax}\left(\frac{1}{M}\sum_{m=1}^{M} z_t^{(m)}\right), \; M=5.
+\end{equation}
+
+\subsection{Algorithmic Stabilization and Coaching Logic}
+To reduce feedback jitter, YogaPoseFusion applies:
+\begin{enumerate}
+\item EMA smoothing of fused features ($\alpha = 0.4$),
+\item temporal majority vote over an 8-frame prediction queue,
+\item confidence gate $\tau = 0.55$; below threshold, corrections are suppressed,
+\item issue persistence requiring 3 consecutive frames before surfacing a correction.
+\end{enumerate}
+
+Pose-aware coaching rules are encoded in 22 normalized pose templates (79 rules total) plus 4 fallback rules, generated from joint-angle constraints and priority ordering.
+
+The temporal operators are implemented as:
+\begin{equation}
+\tilde{f}_t = \alpha f_t + (1-\alpha)\tilde{f}_{t-1},
+\end{equation}
+\begin{equation}
+\bar{c}_t = \mathrm{mode}\left(\hat{c}_{t-w+1}, \ldots, \hat{c}_t\right), \quad w=8,
+\end{equation}
+and a persistence filter where an issue is emitted only after it appears for at least $p=3$ consecutive frames.
+
+\subsection{Session Metric Definitions}
+For a stream with $N$ frames and elapsed time $T$ minutes:
+\begin{equation}
+\mathrm{AvgLatency} = \frac{1}{N}\sum_{t=1}^{N} \ell_t,
+\end{equation}
+\begin{equation}
+\mathrm{FalseAlerts/min} = \frac{A_{\mathrm{transient}}}{T},
+\end{equation}
+where a transient alert is an issue event shorter than 1.0 s. Time-to-correct is computed as the mean duration of non-transient issue episodes.
+
+\subsection{Complexity and Runtime Considerations}
+Per frame, landmark extraction dominates cost in practice, while classifier inference is linear in feature dimension and hidden width. For fused dimension $d=137$ and hidden widths $(1024,512,256)$, one forward pass is computationally lightweight relative to pixel-space backbones. The ensemble multiplies inference by five models, trading latency for improved robustness. This motivates future distillation to a single compact student for low-resource devices.
+
+\subsection{System Integration and API Design}
+The model is exposed through a FastAPI backend supporting both single-shot and streaming use cases. This choice keeps the inference core independent from front-end stack changes and enables reproducible benchmarking through HTTP/WebSocket calls.
+
+\begin{table}[t]
+\caption{Deployed API endpoints used in the coaching workflow}
+\label{tab:api_endpoints}
+\centering
+\begin{tabular}{ll}
+\toprule
+Endpoint & Purpose \\
+\midrule
+GET / & Health + model/device metadata \\
+POST /predict & Single-image pose classification \\
+POST /realtime\_frame & REST frame-wise live coaching \\
+WS /ws/realtime & Low-overhead streaming coaching \\
+GET /session/<id>/summary & Session metric retrieval \\
+POST /session/<id>/reset & Session state reset \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The frontend consumes the same schema across polling and WebSocket modes (pose class, confidence, stable issues, bad joints, landmarks, and runtime metrics), simplifying A/B testing of transport strategy without modifying model logic.
+
+\section{Experimental Setup}
+\subsection{Dataset and Splits}
+We use repository-processed Yoga-82 data \cite{verma2020yoga82}. Table \ref{tab:splits} summarizes split sizes.
+
+\begin{table}[t]
+\caption{Dataset split summary (processed samples)}
+\label{tab:splits}
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+Split & Samples & Classes & Min/Cls & Max/Cls \\
+\midrule
+Train & 10{,}219 & 82 & 22 & 314 \\
+Validation & 2{,}898 & 82 & 5 & 85 \\
+Test & 1{,}556 & 82 & 4 & 39 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Training Protocol}
+The training notebook configuration is:
+\begin{itemize}
+\item 5-fold stratified cross-validation (random seed 42),
+\item 60 epochs max, early stopping patience 8,
+\item AdamW (LR $=10^{-3}$, weight decay $=10^{-4}$),
+\item cosine warm restart scheduler ($T_0=10$, $T_{mult}=2$),
+\item weighted cross-entropy with label smoothing 0.1,
+\item batch size 32,
+\item Gaussian noise augmentation ($\sigma=0.02$), doubling training samples.
+\end{itemize}
+
+\begin{table}[t]
+\caption{Key training and deployment hyperparameters}
+\label{tab:hyperparams}
+\centering
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+Input feature size & 137 \\
+Classes & 82 \\
+K-folds & 5 \\
+Epoch budget & 60 \\
+Early stopping patience & 8 \\
+Batch size & 32 \\
+Optimizer & AdamW \\
+Initial learning rate & $10^{-3}$ \\
+Weight decay & $10^{-4}$ \\
+Label smoothing & 0.1 \\
+EMA $\alpha$ & 0.4 \\
+Prediction window & 8 frames \\
+Issue persistence & 3 frames \\
+Confidence gate & 0.55 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Data Imbalance Profile}
+The processed dataset is strongly imbalanced across classes. Table \ref{tab:imbalance} reports quartiles and imbalance ratios for each split.
+
+\begin{table}[t]
+\caption{Per-class sample distribution statistics}
+\label{tab:imbalance}
+\centering
+\begin{tabular}{lrrrrr}
+\toprule
+Split & Min & Q1 & Median & Max & Max/Min \\
+\midrule
+Train & 22 & 85.75 & 119.0 & 314 & 14.27 \\
+Validation & 5 & 23.25 & 35.5 & 85 & 17.00 \\
+Test & 4 & 13.0 & 18.5 & 39 & 9.75 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Evaluation Protocol}
+All metrics are computed on held-out test metadata labels and feature CSVs. For deployment-aligned reporting, we evaluate both single-fold and 5-fold ensemble checkpoints using the same standardized feature pipeline and scaler used by the backend service.
+
+\subsection{Evaluation Metrics}
+We report top-1 accuracy and macro precision/recall/F1. For runtime, we report average latency, false alerts per minute, and average time-to-correct from persisted session logs.
+
+\section{Results and Discussion}
+\subsection{Classification Performance}
+Table \ref{tab:class_results} reports held-out test performance. Ensemble averaging improves all major metrics over a single fold checkpoint.
+
+\begin{table}[t]
+\caption{Held-out test results on 1{,}556 samples}
+\label{tab:class_results}
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Model & Acc. & Macro P & Macro R & Macro F1 \\
+\midrule
+Single fold-1 & 80.91\% & 79.91\% & 80.69\% & 79.30\% \\
+Ensemble (5 folds) & \textbf{81.88\%} & \textbf{80.76\%} & \textbf{81.33\%} & \textbf{79.93\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The training notebook reports average 5-fold validation accuracy of 85.24\%, showing effective optimization under class imbalance. The held-out test values remain lower, indicating expected distribution and generalization difficulty for fine-grained yoga classes.
+
+\begin{table}[t]
+\caption{Best validation accuracy by fold}
+\label{tab:foldwise}
+\centering
+\begin{tabular}{lcc}
+\toprule
+Fold & Best Epoch & Best Val. Accuracy \\
+\midrule
+1 & 30 & 85.05\% \\
+2 & 29 & 85.23\% \\
+3 & 30 & 86.08\% \\
+4 & 28 & 85.22\% \\
+5 & 30 & 84.61\% \\
+\midrule
+Mean $\pm$ Std & -- & 85.24\% $\pm$ 0.53\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Class-Level Error Profile}
+To characterize where the model struggles, Table \ref{tab:class_extremes} shows low- and high-performing classes on the test set for the 5-model ensemble.
+
+\begin{table}[t]
+\caption{Class-level F1 extremes (5-model ensemble)}
+\label{tab:class_extremes}
+\centering
+\begin{tabular}{lcc|lcc}
+\toprule
+\multicolumn{3}{c|}{Lower F1 classes} & \multicolumn{3}{c}{Higher F1 classes} \\
+Class ID & Support & F1 & Class ID & Support & F1 \\
+\midrule
+51 & 11 & 0.267 & 73 & 19 & 0.974 \\
+76 & 22 & 0.333 & 71 & 21 & 0.952 \\
+11 & 13 & 0.476 & 22 & 23 & 0.958 \\
+15 & 4  & 0.500 & 4  & 19 & 1.000 \\
+67 & 14 & 0.500 & 43 & 6  & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Lower-F1 categories are typically either underrepresented or visually similar to neighboring poses. This aligns with the imbalance profile in Table \ref{tab:imbalance} and supports targeted augmentation and hard-negative mining as next steps.
+
+\subsection{Real-Time Coaching Metrics}
+Table \ref{tab:runtime_results} summarizes two logged sessions.
+
+\begin{table}[t]
+\caption{Session-level runtime/coaching metrics}
+\label{tab:runtime_results}
+\centering
+\begin{tabular}{lcc}
+\toprule
+Metric & Session A & Session B \\
+\midrule
+Frames & 30 & 1{,}290 \\
+Avg latency (ms) & 538.23 & 198.96 \\
+Approx FPS & 1.86 & 5.03 \\
+False alerts/min & 0.00 & 3.66 \\
+Avg time-to-correct (s) & -- & 9.725 \\
+Confidence-suppressed frames & 30 & 639 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Session B demonstrates sustained operation with measurable correction dynamics. The high confidence-suppressed count confirms that gating removes unreliable corrections before reaching the user, improving coaching precision at the cost of occasional silence.
+
+\subsection{Ablation-Oriented Interpretation}
+Even without retraining architecture variants, two practical ablation signals are directly observable:
+\begin{enumerate}
+\item \textbf{Ensemble vs single checkpoint:} accuracy improves from 80.91\% to 81.88\% (absolute +0.97 points), while macro-F1 improves from 79.30 to 79.93 (absolute +0.63 points).
+\item \textbf{Gate influence in streaming:} a large number of confidence-suppressed frames (Table \ref{tab:runtime_results}) indicates the gate is actively filtering unstable suggestions, reducing potential false coaching cues.
+\end{enumerate}
+
+These observations support the design intent: modest but consistent classification gains from ensemble averaging, and substantial practical stabilization from temporal/confidence controls.
+
+\subsection{Qualitative Session Case Analysis}
+Event logs provide interpretable examples of correction dynamics. In one recorded session, short-lived events (e.g., elbow-angle corrections around 0.20 s) were counted as transient alerts, while longer deviations (e.g., knee correction episodes above 3 s) contributed to time-to-correct. This behavior matches the metric definition and confirms that the same rule engine powers both user-facing feedback and objective analytics.
+
+From a usability perspective, three qualitative patterns were observed:
+\begin{enumerate}
+\item \textbf{Suppression before certainty:} low-confidence frames were intentionally muted, preventing unreliable prompts.
+\item \textbf{Persistence before alerting:} brief one-frame fluctuations were filtered before becoming visible corrections.
+\item \textbf{Prioritized messaging:} only top-severity issues were surfaced first, reducing user overload in complex poses.
+\end{enumerate}
+
+These properties are important for coaching interfaces where over-triggered feedback can reduce trust even if classifier accuracy is high.
+
+\subsection{Operational Reliability and Failure Modes}
+Beyond benchmark accuracy, real coaching systems must handle common field failures gracefully. Table \ref{tab:failure_modes} summarizes observed or anticipated operational issues and how the current pipeline addresses them.
+
+\begin{table*}[t]
+\caption{Operational failure modes and mitigation in YogaPoseFusion}
+\label{tab:failure_modes}
+\centering
+\begin{tabular}{p{0.19\textwidth}p{0.22\textwidth}p{0.24\textwidth}p{0.28\textwidth}}
+\toprule
+Failure mode & Typical trigger & Current mitigation & Remaining gap / improvement direction \\
+\midrule
+No pose detected & Partial body visibility, low light, severe motion blur & Frame rejected; API returns no-pose status; UI prompts user to reframe & Add automatic framing hints (distance, body centering arrows) and adaptive exposure checks \\
+\addlinespace
+Jittery class switching & Similar poses across consecutive frames & 8-frame majority vote + EMA-smoothed features & Add temporal neural sequence model (e.g., lightweight TCN/GRU) for stronger continuity priors \\
+\addlinespace
+Unreliable correction text & Low-confidence classification & Confidence gate at 0.55 suppresses coaching feedback & Calibrate confidence thresholds per-pose instead of global fixed threshold \\
+\addlinespace
+Alert spam from micro-deviations & Single-frame or short-lived angle spikes & Issue persistence filter (3 frames) and transient alert accounting & Learn adaptive persistence windows conditioned on pose stability \\
+\addlinespace
+Latency spikes & CPU load, browser-camera transport overhead, ensemble cost & WebSocket mode, asynchronous backend handling, session-level latency tracking & Distill 5-model ensemble to compact student model for lower median and tail latency \\
+\addlinespace
+Class imbalance bias & Rare poses with very low support & Class-weighted loss + stratified folds + label smoothing & Add re-sampling and synthetic pose augmentation for low-support classes \\
+\addlinespace
+User overload from many issues & Multiple simultaneous joint errors & Priority/severity sorting; surface top issues first & Introduce curriculum-style guidance (one corrective goal at a time) \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+This reliability view is important for publication-grade system evaluation because it connects raw metrics to actionable deployment behavior. In particular, the explicit logging of issue episodes and suppression counts allows auditing \emph{why} a session felt stable or unstable, not only \emph{how accurate} frame-wise predictions were.
+
+\subsection{Interpretation}
+Three key observations emerge from Tables \ref{tab:class_results} and \ref{tab:runtime_results}:
+\begin{enumerate}
+\item \textbf{Ensemble benefit:} multi-fold averaging consistently improves classification quality versus a single checkpoint.
+\item \textbf{Temporal robustness:} smoothing and persistence constraints limit flicker and reduce transient false alerts.
+\item \textbf{Deployment gap:} despite acceptable accuracy, latency remains a bottleneck for highly fluid interaction, motivating lighter student models and kernel-level optimization.
+\end{enumerate}
+
+\section{Broader Discussion}
+The landmark+spectral design is compact and explainable, and ensemble inference gives a clear improvement without changing input modality. The stabilization stack reduces noisy feedback, which is critical for user-facing coaching.
+
+\subsection{Threats to Validity}
+Three validity threats should be considered. First, metrics are collected from a single project pipeline and may be sensitive to preprocessing implementation choices. Second, class-level extremes include low-support categories; for some classes, F1 can vary sharply with a few misclassifications. Third, runtime measurements depend on hardware, lighting, and camera framing, so cross-device latency and stability may shift.
+
+\subsection{Reproducibility Notes}
+The full workflow is reproducible from repository artifacts: processed train/valid/test CSV/NPY files, fold checkpoints, scaler, FastAPI inference pipeline, and persisted session logs. Reproduction requires only the same feature construction order (keypoints + spectral), model architecture, and fold checkpoint set.
+
+\subsection{Ethical and Practical Considerations}
+The system is intended as assistive guidance, not a clinical or instructor replacement. For safer deployment, interfaces should clearly indicate uncertainty states (confidence gate triggers), advise users to avoid pain-inducing motions, and encourage professional supervision for rehabilitation populations.
+
+\section{Reproducibility and Deployment Checklist}
+To make this work practically reusable for other teams, we summarize a concise checklist that maps directly to repository artifacts and runtime behavior:
+\begin{enumerate}
+\item \textbf{Dataset integrity:} verify train/valid/test metadata row counts and class totals before training.
+\item \textbf{Feature parity:} ensure the exact same fusion order is used in train and inference (keypoints followed by spectral features).
+\item \textbf{Scaler consistency:} load the serialized training scaler for all validation/test/deployment inference calls.
+\item \textbf{Architecture parity:} keep the deployed model definition byte-compatible with training checkpoints.
+\item \textbf{Fold management:} preserve fold checkpoint naming and loading order for reproducible ensemble averaging.
+\item \textbf{Threshold governance:} treat confidence gate and persistence settings as versioned parameters, not ad-hoc UI values.
+\item \textbf{Transport fallback:} support both REST polling and WebSocket streaming to isolate network-induced instability.
+\item \textbf{Session logging:} persist summaries and issue events for post-session debugging and user-support analytics.
+\item \textbf{Metric auditability:} compute latency, false-alert rates, and correction times from raw event definitions, not UI counters.
+\item \textbf{Safety messaging:} display uncertainty and advisory prompts when confidence gating suppresses feedback for extended periods.
+\end{enumerate}
+
+In practical deployment, we recommend a staged rollout:
+\begin{itemize}
+\item \textbf{Stage 1 (internal validation):} evaluate class-level errors and latency on controlled videos.
+\item \textbf{Stage 2 (pilot users):} monitor session logs for sustained high suppression or high transient-alert rates.
+\item \textbf{Stage 3 (production hardening):} distill the ensemble and add per-pose calibration to reduce latency while preserving stability.
+\end{itemize}
+
+This checklist-oriented framing helps convert a research prototype into an auditable system that can be iteratively improved using evidence from real sessions.
+
+Current limitations are:
+\begin{itemize}
+\item latency still above ideal interactive targets for smooth consumer webcam experiences,
+\item strong class imbalance (train class counts from 22 to 314),
+\item sensitivity to pose visibility, reflected by many confidence-gated frames.
+\end{itemize}
+
+Future work includes lightweight temporal models, confidence calibration, student-model distillation for faster inference, and expanded multi-person or side-view robustness.
+
+\section{Conclusion}
+This work showed that precise real-time yoga coaching requires more than static pose accuracy: it also needs temporal reliability and interpretable correction logic. YogaPoseFusion combines landmark-spectral fusion, ensemble inference, and stabilization controls to address that requirement. On Yoga-82, the method achieved 81.88\% test accuracy and 79.93 macro-F1, with practical runtime evidence from long-session logs. The system is better than a single-fold baseline in both accuracy and feedback stability, and it forms a strong base for future low-latency and personalized coaching research.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

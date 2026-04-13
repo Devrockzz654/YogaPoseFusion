@@ -201,6 +201,33 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# macOS
+.DS_Store
+
+# Node / frontend build artifacts
+node_modules/
+yoga-pose-fusion-frontend/node_modules/
+yoga-pose-fusion-frontend/build/
+
+# Local backup of nested frontend repo metadata
+yoga-pose-fusion-frontend/.git.backup/
+
+# Large local data and generated artifacts not needed for deployment
+backend/data/yoga82/
+backend/data/processed/*.npy
+backend/data/processed/*_keypoints.csv
+backend/data/processed/*_spectral.csv
+backend/data/processed/pose_features_spectral.csv
+backend/data/processed/*_metadata.csv
+backend/data/processed/*_labels.npy
+backend/data/processed/*_label_indices.npy
+backend/data/processed/pose_mapping.json
+backend/__pycache__/
+backend/logs/
+mobile/
+output/
+tmp/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
