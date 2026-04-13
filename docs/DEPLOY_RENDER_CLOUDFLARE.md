@@ -29,9 +29,9 @@ This repo includes [render.yaml](/Volumes/Dev/Project2/YogaPoseFusion/render.yam
 ### Backend dependency files
 
 - Local development: `backend/requirements.txt`
-- Render deployment: `backend/requirements-render.txt`
+- Container and cloud deployment: `backend/requirements-deploy.txt`
 
-The Render file is pinned more tightly for Linux compatibility and stable deploys.
+The deploy file is pinned more tightly for Linux compatibility and stable deploys.
 
 ### Option B: Manual Web Service
 
@@ -39,7 +39,7 @@ If you prefer manual setup, use:
 
 - Root directory: `backend`
 - Environment: `Python`
-- Build command: `pip install -r requirements-render.txt`
+- Build command: `pip install -r requirements-deploy.txt`
 - Start command: `uvicorn inference:app --host 0.0.0.0 --port $PORT`
 
 ### Notes
@@ -97,3 +97,14 @@ Later, you may want to:
 - Replace `allow_origins=["*"]` in the backend CORS config with your Cloudflare Pages domain.
 - Move heavy model assets to external storage if Render build size becomes an issue.
 - Add a custom domain to Cloudflare Pages.
+
+## 8. Hugging Face Docker Space backend
+
+If Render free runs out of memory, this repo can also be deployed as a Hugging Face Docker Space.
+
+- Space SDK: `Docker`
+- Docker file: repo root `Dockerfile`
+- Space config: repo root `README.md`
+- Port: `7860`
+
+The Docker build only copies the backend runtime files and excludes the large training dataset through [.dockerignore](/Volumes/Dev/Project2/YogaPoseFusion/.dockerignore:1).

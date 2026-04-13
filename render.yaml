@@ -7,7 +7,7 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
-    buildCommand: pip install -r requirements-render.txt
+    buildCommand: pip install -r requirements-deploy.txt
     startCommand: uvicorn inference:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /
     autoDeploy: true
