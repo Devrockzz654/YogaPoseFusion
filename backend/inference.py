@@ -158,7 +158,13 @@ scaler = joblib.load(SCALER_PATH)
 # ============================================================
 # MEDIAPIPE POSE INITIALIZATION
 # ============================================================
-mp_pose = mp.solutions.pose
+try:
+    mp_pose = mp.solutions.pose
+except AttributeError:
+    # Some Linux deploy environments expose the legacy solutions API only via
+    # the explicit Python package path.
+    from mediapipe.python.solutions import pose as mp_pose
+
 pose_detector = mp_pose.Pose(static_image_mode=True, model_complexity=2)
 pose_detector_video = mp_pose.Pose(static_image_mode=False, model_complexity=2, min_detection_confidence=0.5)
 
