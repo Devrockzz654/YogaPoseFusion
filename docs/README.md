@@ -1,41 +1,35 @@
-## YogaPoseFusion
+# Docs Overview
 
-Real-time yoga posture coaching system using:
-- MediaPipe pose landmarks
-- Spectral + keypoint fusion model (PyTorch ensemble)
-- FastAPI realtime backend (REST + WebSocket)
-- React webcam UI with live skeleton overlay, bad-joint highlighting, voice cues
+This folder contains the current working documentation for YogaPoseFusion.
 
-### Current Capabilities
-- Pose classification from image and webcam frames
-- Real-time corrective feedback with pose-aware rules
-- User calibration profiles with personalized angle offsets
-- Recovery guidance for low-confidence or poor-framing frames
-- Confidence gating to suppress unreliable corrections
-- Temporal persistence filtering to reduce flicker/noisy alerts
-- Session coaching metrics:
-  - average latency (ms)
-  - false alerts per minute
-  - average time-to-correct (seconds)
-- Persistent session logs on backend:
-  - `backend/logs/sessions/<stream_id>/summary.json`
-  - `backend/logs/sessions/<stream_id>/issue_events.jsonl`
+## Files
 
-### Project Structure
-- `backend/inference.py`: main API + realtime coaching pipeline
-- `backend/models/pose_correction.py`: pose-specific correction rules
-- `backend/models/personalization.py`: calibration profile storage and offsets
-- `backend/models/frame_quality.py`: framing/lighting quality heuristics
-- `backend/models/pose_graph_spectral.py`: spectral feature extraction
-- `backend/models/*.pt`: trained ensemble checkpoints
-- `scripts/*.ipynb`: preprocessing/training/inference notebooks
-- `yoga-pose-fusion-frontend/`: React live UI
+- `API_DOCUMENTATION.md`
+  Explains the backend endpoints exposed by `backend/inference.py`.
 
-### Quick Start
-See `/Volumes/Dev/Project2/YogaPoseFusion/docs/SETUP_GUIDE.md`.
+- `SETUP_GUIDE.md`
+  Local development setup for the FastAPI backend and React frontend.
 
-### API
-See `/Volumes/Dev/Project2/YogaPoseFusion/docs/API_DOCUMENTATION.md`.
+- `DEMO_CHECKLIST.md`
+  A practical checklist for testing or presenting the app end-to-end.
 
-### Demo Workflow
-See `/Volumes/Dev/Project2/YogaPoseFusion/docs/DEMO_CHECKLIST.md`.
+- `DEPLOY_HUGGINGFACE_CLOUDFLARE.md`
+  Production deployment flow for:
+  - Hugging Face Docker Space backend
+  - Cloudflare Pages frontend
+  - Firebase Google authentication
+
+## Current Stack
+
+- Backend: FastAPI + MediaPipe + PyTorch ensemble
+- Frontend: Create React App
+- Auth: Local form-based auth plus Firebase Google sign-in
+- Backend hosting: Hugging Face Docker Space
+- Frontend hosting: Cloudflare Pages
+
+## Recommended Reading Order
+
+1. `SETUP_GUIDE.md`
+2. `API_DOCUMENTATION.md`
+3. `DEMO_CHECKLIST.md`
+4. `DEPLOY_HUGGINGFACE_CLOUDFLARE.md`

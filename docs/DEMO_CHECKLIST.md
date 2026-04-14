@@ -1,58 +1,59 @@
-## Final Demo Checklist
+# Demo Checklist
 
-### Pre-Demo (10-15 min before)
-1. Start backend:
+## Before The Demo
+
+1. Start the backend:
+
 ```bash
-cd /Volumes/Dev/Project2/YogaPoseFusion/backend
+cd backend
 uvicorn inference:app --host 0.0.0.0 --port 8000
 ```
-2. Start frontend:
+
+2. Start the frontend:
+
 ```bash
-cd /Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend
+cd yoga-pose-fusion-frontend
 npm start
 ```
-3. Open `http://localhost:3000`.
-4. Confirm API status is `Connected`.
-5. Ensure webcam permission is granted.
 
-### Demo Flow
-1. Show static image prediction (`Upload Image` + classify).
-2. Start camera.
-3. Start real-time coaching (`Start Real-time`).
-4. Perform one correct pose and show:
-   - `Good alignment`
-   - low/no issue markers.
-5. Intentionally break posture (e.g., bend knee too much) and show:
-   - specific correction message
-   - red highlighted bad joints
-   - focus joint + direction.
-6. Correct posture and show:
-   - issue clears
-   - feedback improves.
-7. Point out metrics panel:
-   - latency
-   - false alerts/min
-   - time-to-correct.
+3. Open `http://localhost:3000`
+4. Confirm the backend root responds at `http://localhost:8000/`
+5. Allow webcam permission in the browser
 
-### Session Evidence
-1. Reset session:
+## Suggested Demo Flow
+
+1. Show the landing page and auth panel
+2. Register or log in
+3. Walk through the Journey tab
+4. Enter age, experience level, goals, and health factors
+5. Generate recommendations
+6. Show the recommended routine and ranked pose library
+7. Open Live Coach for one selected pose
+8. Test one aligned posture and one intentionally incorrect posture
+
+## Useful Backend Checks
+
+Health check:
+
 ```bash
-curl -X POST http://localhost:8000/session/web_ui_<id>/reset
+curl http://localhost:8000/
 ```
-2. Fetch summary:
-```bash
-curl http://localhost:8000/session/web_ui_<id>/summary
-```
-3. Show persisted files:
-- `backend/logs/sessions/<stream_id>/summary.json`
-- `backend/logs/sessions/<stream_id>/issue_events.jsonl`
 
-### Backup Plan
-1. If WebSocket is unstable, use `Start REST`.
-2. If pose not detected:
-   - increase lighting
-   - move full body into frame
-   - hold pose 1-2 seconds.
-3. If corrections seem noisy:
-   - keep pose steady
-   - use a simpler pose (e.g., Chair, Plank, Warrior II).
+Pose catalog:
+
+```bash
+curl http://localhost:8000/poses/catalog
+```
+
+Session reset:
+
+```bash
+curl -X POST http://localhost:8000/session/demo/reset
+```
+
+## Backup Plan
+
+- If Google login is unavailable, use the local form-based auth
+- If webcam flow is unstable, use a single-frame upload flow in Live Coach
+- If TTS is unavailable, continue without voice and focus on visual feedback
+- If pose detection is weak, improve lighting and keep the whole body inside the frame

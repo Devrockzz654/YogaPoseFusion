@@ -1,61 +1,90 @@
-## Setup Guide
+# Setup Guide
 
-### 1. Prerequisites
+## 1. Prerequisites
+
 - Python 3.10+
-- Node.js 18+
+- Node.js 20+ recommended
 - npm
-- Webcam
+- Webcam access for live coaching
 
-### 2. Backend Setup
-From `/Volumes/Dev/Project2/YogaPoseFusion`:
+## 2. Backend Setup
+
+From the repo root:
 
 ```bash
+cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
-pip install fastapi uvicorn numpy torch mediapipe pillow joblib networkx scipy scikit-learn python-multipart
+pip install -r requirements.txt
 ```
 
-Notes:
-- If you already have a working Conda env, use it instead.
-- Model files must exist in `backend/models/`.
+Start the backend:
 
-### 3. Start Backend
 ```bash
-cd /Volumes/Dev/Project2/YogaPoseFusion/backend
 uvicorn inference:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Backend should be available at:
+Backend URLs:
+
 - `http://localhost:8000`
 - Swagger docs: `http://localhost:8000/docs`
 
-### 4. Frontend Setup
+## 3. Frontend Setup
+
+From the repo root:
+
 ```bash
-cd /Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend
+cd yoga-pose-fusion-frontend
 npm install
 npm start
 ```
 
-Frontend default URL:
+Frontend URL:
+
 - `http://localhost:3000`
 
-### 5. Realtime Coaching Test
-1. Open frontend.
-2. Click `Start Camera`.
-3. Click `Start Real-time` (WebSocket) or `Start REST`.
-4. Check:
-   - live feedback
-   - red highlighted bad joints
-   - coaching metrics panel
-   - optional voice cues
+## 4. Frontend Environment Variables
 
-### 6. Session Logs
-Realtime sessions are persisted under:
-- `/Volumes/Dev/Project2/YogaPoseFusion/backend/logs/sessions/<stream_id>/summary.json`
-- `/Volumes/Dev/Project2/YogaPoseFusion/backend/logs/sessions/<stream_id>/issue_events.jsonl`
+The frontend reads configuration from `.env` values based on `.env.example`.
 
-### 7. Common Issues
-- `No pose detected`: ensure full body is visible and lighting is sufficient.
-- Camera permission denied: allow browser camera access.
-- High false alerts: increase confidence gate or widen pose rule ranges.
+Minimum local value:
+
+```text
+REACT_APP_API_BASE_URL=http://localhost:8000
+```
+
+Optional Firebase values for Google sign-in:
+
+- `REACT_APP_FIREBASE_API_KEY`
+- `REACT_APP_FIREBASE_AUTH_DOMAIN`
+- `REACT_APP_FIREBASE_PROJECT_ID`
+- `REACT_APP_FIREBASE_STORAGE_BUCKET`
+- `REACT_APP_FIREBASE_MESSAGING_SENDER_ID`
+- `REACT_APP_FIREBASE_APP_ID`
+
+If Firebase values are missing, the app still supports the local form-based login/register flow.
+
+## 5. Local Verification
+
+After both frontend and backend are running:
+
+1. open `http://localhost:3000`
+2. register or log in with the local form
+3. optionally test Google sign-in if Firebase is configured
+4. generate recommendations from the Journey tab
+5. move to Live Coach and confirm backend status is reachable
+
+## 6. Common Local Issues
+
+- `No pose detected`
+  Ensure the full body is visible and the frame has enough lighting.
+
+- `Camera permission denied`
+  Allow camera access in the browser.
+
+- `auth/api-key-not-valid`
+  Re-check the Firebase API key in frontend env vars or Cloudflare env vars.
+
+- TTS unavailable
+  The backend may be running without the required OpenAI credentials.
