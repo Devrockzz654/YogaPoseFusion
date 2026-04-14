@@ -11,135 +11,148 @@ short_description: Yoga pose classification backend.
 
 # YogaPoseFusion
 
-YogaPoseFusion is a yoga coaching project that combines:
+An AI-assisted yoga coaching platform that combines pose recognition, personalized practice planning, and real-time correction in a single web experience.
 
-- pose classification from body landmarks
-- personalized yoga routine recommendations
-- real-time posture correction
-- a React frontend for guided practice
-- a FastAPI backend for inference, recommendations, and live coaching APIs
+[Live Website](https://yogaposefusion.pages.dev) | [Docs](./docs/README.md) | [Deployment Guide](./docs/DEPLOY_HUGGINGFACE_CLOUDFLARE.md)
 
-The current repository contains the production web app and backend. Older unfinished mobile work and research-paper scaffolding have been removed from the active codebase.
+## Why This Project Exists
 
-## What The Project Does
+YogaPoseFusion is built for self-guided practice. Instead of giving every user the same routine, it tries to adapt the session to the person and then help them execute the selected pose more accurately.
 
-The system is designed to help a user:
+The core idea is:
 
-1. create a wellness profile based on age, experience, goals, and health factors
-2. generate a ranked yoga routine from the Yoga-82 pose catalog
-3. practice a selected pose with live coaching
-4. receive feedback about pose alignment, confidence, and corrections
+1. understand the user profile
+2. recommend poses that fit the user’s goals and health factors
+3. analyze the performed pose from visual landmarks
+4. return alignment-aware feedback in real time
 
-At a high level:
+## What It Includes
 
-- the backend extracts pose landmarks and derived spectral features
-- an ensemble of trained PyTorch models predicts the pose
-- pose-specific rule logic generates correction guidance
-- the frontend lets users log in, create a profile, generate a routine, and open the live coach
+### Personalized Practice Planning
 
-## Current Architecture
+- age-aware and experience-aware routine generation
+- goal-based and health-factor-aware ranking
+- guided pose selection from the Yoga-82 pose library
+- routine summaries, hold durations, repetitions, and coaching notes
+
+### Real-Time Coaching
+
+- pose classification from image or webcam frames
+- correction rules based on landmark geometry and pose-aware heuristics
+- feedback for low-confidence or poor-framing conditions
+- REST and WebSocket-based live coaching modes
+- optional voice synthesis support when backend TTS is configured
+
+### Web Product Experience
+
+- React-based guided practice interface
+- local form-based login/register flow
+- Firebase Google sign-in
+- live coach interface with backend connectivity
+- deployment-ready frontend on Cloudflare Pages
+
+## Live Project
+
+Production frontend:
+
+- [https://yogaposefusion.pages.dev](https://yogaposefusion.pages.dev)
+
+Current production architecture:
+
+- Frontend: Cloudflare Pages
+- Backend: Hugging Face Docker Space
+- Auth: Firebase Google sign-in plus local form-based auth in the UI
+
+## Architecture Overview
 
 ### Backend
 
-The backend lives in [`backend/`](/Volumes/Dev/Project2/YogaPoseFusion/backend) and is built with FastAPI.
+The backend is a FastAPI service located in [`backend/`](/Volumes/Dev/Project2/YogaPoseFusion/backend).
 
-Main responsibilities:
+It is responsible for:
 
-- load the trained pose-classification ensemble
-- expose health and catalog endpoints
-- generate personalized recommendations
-- accept image or webcam frame uploads
-- provide real-time and session-based coaching responses
-- expose text-to-speech support when OpenAI credentials are configured
+- loading the PyTorch ensemble checkpoints
+- extracting and transforming pose features
+- serving the guided pose catalog
+- generating recommendation plans
+- running single-frame and realtime coaching inference
+- exposing optional text-to-speech output
 
-Core backend files:
+Key backend files:
 
-- [`backend/inference.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/inference.py): main FastAPI app and inference pipeline
-- [`backend/models/recommendations.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/models/recommendations.py): recommendation logic and pose catalog helpers
-- [`backend/models/pose_correction.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/models/pose_correction.py): pose-aware correction rules
-- [`backend/models/frame_quality.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/models/frame_quality.py): framing and quality heuristics
-- [`backend/models/personalization.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/models/personalization.py): profile storage and calibration helpers
-- [`backend/models/pose_graph_spectral.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/models/pose_graph_spectral.py): spectral feature extraction
+- [`backend/inference.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/inference.py)
+- [`backend/models/recommendations.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/models/recommendations.py)
+- [`backend/models/pose_correction.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/models/pose_correction.py)
+- [`backend/models/frame_quality.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/models/frame_quality.py)
+- [`backend/models/personalization.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/models/personalization.py)
+- [`backend/models/pose_graph_spectral.py`](/Volumes/Dev/Project2/YogaPoseFusion/backend/models/pose_graph_spectral.py)
 
 Model assets:
 
-- `backend/models/pose_classifier_v4_fold1.pt` to `fold5.pt`
+- `backend/models/pose_classifier_v4_fold1.pt` to `backend/models/pose_classifier_v4_fold5.pt`
 - `backend/models/scaler.pkl`
 
 ### Frontend
 
-The active frontend lives in [`yoga-pose-fusion-frontend/`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend).
+The active frontend is in [`yoga-pose-fusion-frontend/`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend).
 
-It is a Create React App project that provides:
+It handles:
 
-- login and registration with local form-based auth
-- Google sign-in through Firebase Auth
-- profile intake for user wellness and practice preferences
-- recommendation generation UI
-- live coaching workflow
-- backend URL configuration for local or deployed usage
+- authentication UI
+- recommendation generation flow
+- live practice UX
+- backend status and API integration
+- Firebase Google auth wiring
 
-Important frontend files:
+Key frontend files:
 
-- [`yoga-pose-fusion-frontend/src/App.js`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend/src/App.js): main app shell and authentication flow
-- [`yoga-pose-fusion-frontend/src/PoseClassifier.js`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend/src/PoseClassifier.js): live coaching UI
-- [`yoga-pose-fusion-frontend/src/services/api.js`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend/src/services/api.js): frontend API client
-- [`yoga-pose-fusion-frontend/src/firebase.js`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend/src/firebase.js): Firebase Google auth wiring
+- [`yoga-pose-fusion-frontend/src/App.js`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend/src/App.js)
+- [`yoga-pose-fusion-frontend/src/PoseClassifier.js`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend/src/PoseClassifier.js)
+- [`yoga-pose-fusion-frontend/src/services/api.js`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend/src/services/api.js)
+- [`yoga-pose-fusion-frontend/src/firebase.js`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend/src/firebase.js)
 
 ## Repository Structure
 
 ```text
 YogaPoseFusion/
-├── backend/                     FastAPI backend and model assets
-├── docs/                        setup, API, demo, and deployment notes
+├── backend/                     FastAPI backend, model files, recommendation logic
+├── docs/                        project documentation
 ├── requirements/                supporting requirements files
-├── scripts/                     notebooks and helper scripts used during development
+├── scripts/                     notebooks and helper experimentation scripts
 ├── yoga-pose-fusion-frontend/   active React frontend
-├── Dockerfile                   Docker build for backend deployment
-└── README.md                    project overview
+├── Dockerfile                   backend deployment image for Hugging Face Spaces
+└── README.md                    repository overview
 ```
 
-## Main Features
+## Core Features
 
-- Yoga pose classification from webcam/image pose landmarks
-- Personalized routine generation using:
-  - age
-  - experience level
-  - session duration
-  - goals
-  - health factors
-- Live coaching with:
-  - pose classification
-  - corrective feedback
-  - session reset support
-  - optional WebSocket-based realtime flow
-- Pose catalog and guided recommendations
-- Firebase Google sign-in on the frontend
-- Optional text-to-speech voice guidance through OpenAI-compatible TTS config
+- Pose classification from landmark-driven features
+- Personalized recommendation generation
+- Guided pose library and routine selection
+- Realtime feedback and correction
+- Session-level coaching flow
+- Firebase Google sign-in support
+- Cloud-ready deployment setup for frontend and backend
 
 ## Local Development
 
-### Backend
-
-Create a Python environment, install dependencies, and start FastAPI from the backend folder.
-
-Typical local flow:
+### Run The Backend
 
 ```bash
 cd /Volumes/Dev/Project2/YogaPoseFusion/backend
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn inference:app --host 0.0.0.0 --port 8000
+uvicorn inference:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Local backend URL:
+Backend URL:
 
 ```text
 http://localhost:8000
 ```
 
-### Frontend
-
-Run the React app from the frontend folder:
+### Run The Frontend
 
 ```bash
 cd /Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend
@@ -147,26 +160,19 @@ npm install
 npm start
 ```
 
-The frontend reads the backend URL from:
-
-- `REACT_APP_API_BASE_URL`
-
-The sample env file is:
-
-- [`yoga-pose-fusion-frontend/.env.example`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend/.env.example)
-
-For local development, that value is usually:
+Frontend URL:
 
 ```text
-REACT_APP_API_BASE_URL=http://localhost:8000
+http://localhost:3000
 ```
 
-## Firebase Auth Setup
+## Environment Variables
 
-The frontend supports Google authentication through Firebase.
+### Frontend
 
-Required frontend environment variables:
+The frontend uses:
 
+- `REACT_APP_API_BASE_URL`
 - `REACT_APP_FIREBASE_API_KEY`
 - `REACT_APP_FIREBASE_AUTH_DOMAIN`
 - `REACT_APP_FIREBASE_PROJECT_ID`
@@ -174,81 +180,53 @@ Required frontend environment variables:
 - `REACT_APP_FIREBASE_MESSAGING_SENDER_ID`
 - `REACT_APP_FIREBASE_APP_ID`
 
-Firebase notes:
+Reference file:
 
-- enable `Google` under Firebase Authentication
-- add your Cloudflare Pages domain under `Authentication -> Settings -> Authorized domains`
+- [`yoga-pose-fusion-frontend/.env.example`](/Volumes/Dev/Project2/YogaPoseFusion/yoga-pose-fusion-frontend/.env.example)
 
-## API And Docs
+### Backend
 
-Additional project documentation:
+The backend can optionally use environment variables for TTS-related features. If those are missing, core pose analysis and recommendation flows still work.
+
+## Documentation
+
+Project docs live in [`docs/`](/Volumes/Dev/Project2/YogaPoseFusion/docs).
+
+Start here:
 
 - [`docs/README.md`](/Volumes/Dev/Project2/YogaPoseFusion/docs/README.md)
-- [`docs/API_DOCUMENTATION.md`](/Volumes/Dev/Project2/YogaPoseFusion/docs/API_DOCUMENTATION.md)
 - [`docs/SETUP_GUIDE.md`](/Volumes/Dev/Project2/YogaPoseFusion/docs/SETUP_GUIDE.md)
+- [`docs/API_DOCUMENTATION.md`](/Volumes/Dev/Project2/YogaPoseFusion/docs/API_DOCUMENTATION.md)
 - [`docs/DEMO_CHECKLIST.md`](/Volumes/Dev/Project2/YogaPoseFusion/docs/DEMO_CHECKLIST.md)
 - [`docs/DEPLOY_HUGGINGFACE_CLOUDFLARE.md`](/Volumes/Dev/Project2/YogaPoseFusion/docs/DEPLOY_HUGGINGFACE_CLOUDFLARE.md)
 
 ## Deployment
 
-### Current Direction
+### Backend
 
-The project is now set up around:
+The backend is prepared for Hugging Face Docker Spaces using:
 
-- Backend: Hugging Face Docker Space
-- Frontend: Cloudflare Pages
+- [`Dockerfile`](/Volumes/Dev/Project2/YogaPoseFusion/Dockerfile)
+- [`.dockerignore`](/Volumes/Dev/Project2/YogaPoseFusion/.dockerignore)
+- the Space metadata in this root README
 
-### Backend Deployment
+### Frontend
 
-The root [`Dockerfile`](/Volumes/Dev/Project2/YogaPoseFusion/Dockerfile) supports backend deployment as a Hugging Face Docker Space.
+The frontend is deployed on Cloudflare Pages with:
 
-Important details:
+- root directory: `yoga-pose-fusion-frontend`
+- framework preset: `React Static`
+- build command: `npm run build`
+- output directory: `build`
 
-- Space SDK: `Docker`
-- Port: `7860`
-- root README front matter is compatible with Space metadata
+## Current Status
 
-### Frontend Deployment
+The repository is now focused on the active web product only:
 
-Cloudflare Pages should use:
-
-- Framework preset: `React Static`
-- Root directory: `yoga-pose-fusion-frontend`
-- Build command: `npm run build`
-- Build output directory: `build`
-
-Important production environment variables:
-
-- `REACT_APP_API_BASE_URL`
-- `REACT_APP_FIREBASE_API_KEY`
-- `REACT_APP_FIREBASE_AUTH_DOMAIN`
-- `REACT_APP_FIREBASE_PROJECT_ID`
-- `REACT_APP_FIREBASE_STORAGE_BUCKET`
-- `REACT_APP_FIREBASE_MESSAGING_SENDER_ID`
-- `REACT_APP_FIREBASE_APP_ID`
-- `NODE_VERSION=22`
-
-## Known Practical Notes
-
-- The backend currently allows broad CORS and can be tightened later for the production frontend domain.
-- Text-to-speech support may show as unavailable until the required OpenAI environment variables are configured in the backend deployment.
-- Some training and experimentation artifacts still exist under `scripts/`, but they are not required for the deployed web product.
-- Local form-based auth in the frontend is convenience auth only; Google sign-in is the stronger user-facing option.
-
-## Status
-
-The repository is now focused on the working web stack:
-
+- web frontend
 - FastAPI backend
-- PyTorch pose ensemble
-- React frontend
-- Cloudflare Pages frontend deployment
-- Hugging Face backend deployment
-- Firebase Google authentication
+- pose recommendation and live coaching flow
+- Firebase-backed Google sign-in
+- Hugging Face + Cloudflare deployment path
 
-If you want to explore the product quickly, start with:
-
-1. backend local run or deployed backend URL
-2. frontend setup in `yoga-pose-fusion-frontend/`
-3. recommendation flow
-4. live coach flow
+Older abandoned mobile work and paper-specific repository clutter have been removed so the project reflects the current product direction more clearly.
