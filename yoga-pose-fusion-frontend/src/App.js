@@ -6,6 +6,12 @@ import React, {
   useState,
 } from "react";
 import PoseClassifier from "./PoseClassifier";
+import {
+  isFirebaseConfigured,
+  signInWithGoogle,
+  signOutUser,
+  subscribeToAuthChanges,
+} from "./firebase";
 import { fetchRecommendations } from "./services/api";
 import "./App.css";
 
@@ -96,6 +102,19 @@ function toggleChoice(values, nextValue) {
   return [...values, nextValue];
 }
 
+function normalizeAuthMessage(error) {
+  switch (error?.code) {
+    case "auth/popup-closed-by-user":
+      return "Google sign-in was closed before it finished.";
+    case "auth/popup-blocked":
+      return "Your browser blocked the Google sign-in popup.";
+    case "auth/cancelled-popup-request":
+      return "A sign-in popup is already open.";
+    default:
+      return error?.message || "Unable to sign in right now.";
+  }
+}
+
 function ChoiceGrid({ options, selectedValues, onToggle }) {
   return (
     <div className="choice-grid">
@@ -116,7 +135,13 @@ function ChoiceGrid({ options, selectedValues, onToggle }) {
   );
 }
 
-function PublicSection({ authMode, setAuthMode, loginForm, setLoginForm, registerForm, setRegisterForm, onLogin, onRegister, authError }) {
+function PublicSection({
+  authMode,
+  setAuthMode,
+  onGoogleAuth,
+  authError,
+  authLoading,
+}) {
   return (
     <div className="public-shell">
       <header className="site-nav">
@@ -207,76 +232,42 @@ function PublicSection({ authMode, setAuthMode, loginForm, setLoginForm, registe
                 </button>
               </div>
 
-              {authMode === "login" ? (
-                <form className="auth-form" onSubmit={onLogin}>
-                  <label>Email</label>
-                  <input
-                    type="email"
-                    value={loginForm.email}
-                    onChange={(event) =>
-                      setLoginForm((prev) => ({ ...prev, email: event.target.value }))
-                    }
-                    required
-                  />
-                  <label>Password</label>
-                  <input
-                    type="password"
-                    value={loginForm.password}
-                    onChange={(event) =>
-                      setLoginForm((prev) => ({ ...prev, password: event.target.value }))
-                    }
-                    required
-                  />
-                  <button className="primary-button" type="submit">
-                    Enter dashboard
-                  </button>
-                </form>
-              ) : (
-                <form className="auth-form" onSubmit={onRegister}>
-                  <label>Name</label>
-                  <input
-                    type="text"
-                    value={registerForm.name}
-                    onChange={(event) =>
-                      setRegisterForm((prev) => ({ ...prev, name: event.target.value }))
-                    }
-                    required
-                  />
-                  <label>Email</label>
-                  <input
-                    type="email"
-                    value={registerForm.email}
-                    onChange={(event) =>
-                      setRegisterForm((prev) => ({ ...prev, email: event.target.value }))
-                    }
-                    required
-                  />
-                  <label>Password</label>
-                  <input
-                    type="password"
-                    value={registerForm.password}
-                    onChange={(event) =>
-                      setRegisterForm((prev) => ({ ...prev, password: event.target.value }))
-                    }
-                    required
-                  />
-                  <label>Confirm password</label>
-                  <input
-                    type="password"
-                    value={registerForm.confirmPassword}
-                    onChange={(event) =>
-                      setRegisterForm((prev) => ({
-                        ...prev,
-                        confirmPassword: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                  <button className="primary-button" type="submit">
-                    Create account
-                  </button>
-                </form>
-              )}
+              <div className="auth-form">
+                <div className="auth-intro">
+                  <strong>
+                    {authMode === "login"
+                      ? "Use Google to sign in securely."
+                      : "Create your account with Google in one step."}
+                  </strong>
+                  <p>
+                    Google sign-in keeps sessions more reliable than local passwords and
+                    makes it easier to move between devices.
+                  </p>
+                </div>
+
+                <button
+                  className="primary-button google-auth-button"
+                  onClick={onGoogleAuth}
+                  type="button"
+                  disabled={authLoading || !isFirebaseConfigured}
+                >
+                  <span className="google-mark" aria-hidden="true">
+                    G
+                  </span>
+                  {authLoading
+                    ? "Connecting to Google..."
+                    : authMode === "login"
+                      ? "Continue with Google"
+                      : "Register with Google"}
+                </button>
+
+                {!isFirebaseConfigured ? (
+                  <div className="auth-helper">
+                    Firebase is not configured yet. Add the Firebase environment variables
+                    to enable Google sign-in.
+                  </div>
+                ) : null}
+              </div>
 
               {authError ? <div className="form-error">{authError}</div> : null}
             </div>
@@ -602,16 +593,9 @@ export default function App() {
   const [authMode, setAuthMode] = useState("login");
   const [activeTab, setActiveTab] = useState("journey");
   const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState("");
   const [recommendationLoading, setRecommendationLoading] = useState(false);
-
-  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
-  const [registerForm, setRegisterForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
 
   useEffect(() => {
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
@@ -628,6 +612,71 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   }, [prefs]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthChanges((firebaseUser) => {
+      setSession((prev) => {
+        if (!firebaseUser?.email) {
+          return null;
+        }
+
+        const nextSession = {
+          email: firebaseUser.email,
+          name: firebaseUser.displayName || firebaseUser.email.split("@")[0],
+          photoURL: firebaseUser.photoURL || "",
+        };
+
+        if (
+          prev?.email === nextSession.email &&
+          prev?.name === nextSession.name &&
+          prev?.photoURL === nextSession.photoURL
+        ) {
+          return prev;
+        }
+
+        return nextSession;
+      });
+
+      if (!firebaseUser?.email) {
+        return;
+      }
+
+      setUsers((prevUsers) => {
+        const existingUser = prevUsers.find(
+          (user) => user.email.toLowerCase() === firebaseUser.email.toLowerCase()
+        );
+
+        if (existingUser) {
+          return prevUsers.map((user) =>
+            user.email.toLowerCase() === firebaseUser.email.toLowerCase()
+              ? {
+                  ...user,
+                  name:
+                    firebaseUser.displayName ||
+                    user.name ||
+                    firebaseUser.email.split("@")[0],
+                  photoURL: firebaseUser.photoURL || user.photoURL || "",
+                }
+              : user
+          );
+        }
+
+        return [
+          ...prevUsers,
+          {
+            name: firebaseUser.displayName || firebaseUser.email.split("@")[0],
+            email: firebaseUser.email,
+            createdAt: Date.now(),
+            photoURL: firebaseUser.photoURL || "",
+            authProvider: "google",
+            ...createUserProfile(),
+          },
+        ];
+      });
+    });
+
+    return unsubscribe;
+  }, []);
 
   const currentUser = useMemo(() => {
     if (!session?.email) return null;
@@ -658,64 +707,22 @@ export default function App() {
     );
   };
 
-  const handleRegister = (event) => {
-    event.preventDefault();
+  const handleGoogleAuth = async () => {
     setAuthError("");
+    setAuthLoading(true);
 
-    const { name, email, password, confirmPassword } = registerForm;
-    if (!name || !email || !password || !confirmPassword) {
-      setAuthError("Please complete every registration field.");
-      return;
+    try {
+      await signInWithGoogle();
+      setActiveTab("journey");
+    } catch (error) {
+      setAuthError(normalizeAuthMessage(error));
+    } finally {
+      setAuthLoading(false);
     }
-    if (password !== confirmPassword) {
-      setAuthError("Passwords do not match.");
-      return;
-    }
-    if (users.some((user) => user.email.toLowerCase() === email.toLowerCase())) {
-      setAuthError("That email is already in use.");
-      return;
-    }
-
-    const createdUser = {
-      name,
-      email,
-      password,
-      createdAt: Date.now(),
-      ...createUserProfile(),
-    };
-
-    setUsers((prev) => [...prev, createdUser]);
-    setSession({ email });
-    setActiveTab("journey");
-    setRegisterForm({
-      name: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-    });
   };
 
-  const handleLogin = (event) => {
-    event.preventDefault();
-    setAuthError("");
-
-    const matchedUser = users.find(
-      (user) =>
-        user.email.toLowerCase() === loginForm.email.toLowerCase() &&
-        user.password === loginForm.password
-    );
-
-    if (!matchedUser) {
-      setAuthError("Invalid email or password.");
-      return;
-    }
-
-    setSession({ email: matchedUser.email });
-    setActiveTab("journey");
-    setLoginForm({ email: "", password: "" });
-  };
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOutUser();
     setSession(null);
     setActiveTab("journey");
     setRecommendationError("");
@@ -784,13 +791,9 @@ export default function App() {
       <PublicSection
         authMode={authMode}
         setAuthMode={setAuthMode}
-        loginForm={loginForm}
-        setLoginForm={setLoginForm}
-        registerForm={registerForm}
-        setRegisterForm={setRegisterForm}
-        onLogin={handleLogin}
-        onRegister={handleRegister}
+        onGoogleAuth={handleGoogleAuth}
         authError={authError}
+        authLoading={authLoading}
       />
     );
   }

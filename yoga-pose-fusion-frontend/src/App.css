@@ -376,6 +376,37 @@ img {
   margin-top: 18px;
 }
 
+.auth-intro p,
+.auth-helper {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.google-auth-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.google-auth-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.google-mark {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 251, 244, 0.18);
+  border: 1px solid rgba(255, 251, 244, 0.34);
+  font-weight: 800;
+}
+
 .auth-form label,
 .stacked-field span,
 .field-block strong,
