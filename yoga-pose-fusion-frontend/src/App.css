@@ -191,6 +191,10 @@ img {
   color: var(--teal);
 }
 
+.panel-kicker {
+  margin-bottom: 14px;
+}
+
 .public-main,
 .dashboard-main {
   width: min(1280px, calc(100% - 32px));
@@ -374,6 +378,31 @@ img {
 
 .auth-form {
   margin-top: 18px;
+}
+
+.auth-divider {
+  position: relative;
+  margin: 4px 0;
+  text-align: center;
+}
+
+.auth-divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+}
+
+.auth-divider span {
+  position: relative;
+  display: inline-block;
+  padding: 0 12px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.9rem;
 }
 
 .auth-intro p,

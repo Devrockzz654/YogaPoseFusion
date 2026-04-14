@@ -138,6 +138,12 @@ function ChoiceGrid({ options, selectedValues, onToggle }) {
 function PublicSection({
   authMode,
   setAuthMode,
+  loginForm,
+  setLoginForm,
+  registerForm,
+  setRegisterForm,
+  onLogin,
+  onRegister,
   onGoogleAuth,
   authError,
   authLoading,
@@ -233,10 +239,85 @@ function PublicSection({
               </div>
 
               <div className="auth-form">
+                {authMode === "login" ? (
+                  <form className="auth-form" onSubmit={onLogin}>
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={loginForm.email}
+                      onChange={(event) =>
+                        setLoginForm((prev) => ({ ...prev, email: event.target.value }))
+                      }
+                      required
+                    />
+                    <label>Password</label>
+                    <input
+                      type="password"
+                      value={loginForm.password}
+                      onChange={(event) =>
+                        setLoginForm((prev) => ({ ...prev, password: event.target.value }))
+                      }
+                      required
+                    />
+                    <button className="primary-button" type="submit">
+                      Enter dashboard
+                    </button>
+                  </form>
+                ) : (
+                  <form className="auth-form" onSubmit={onRegister}>
+                    <label>Name</label>
+                    <input
+                      type="text"
+                      value={registerForm.name}
+                      onChange={(event) =>
+                        setRegisterForm((prev) => ({ ...prev, name: event.target.value }))
+                      }
+                      required
+                    />
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={registerForm.email}
+                      onChange={(event) =>
+                        setRegisterForm((prev) => ({ ...prev, email: event.target.value }))
+                      }
+                      required
+                    />
+                    <label>Password</label>
+                    <input
+                      type="password"
+                      value={registerForm.password}
+                      onChange={(event) =>
+                        setRegisterForm((prev) => ({ ...prev, password: event.target.value }))
+                      }
+                      required
+                    />
+                    <label>Confirm password</label>
+                    <input
+                      type="password"
+                      value={registerForm.confirmPassword}
+                      onChange={(event) =>
+                        setRegisterForm((prev) => ({
+                          ...prev,
+                          confirmPassword: event.target.value,
+                        }))
+                      }
+                      required
+                    />
+                    <button className="primary-button" type="submit">
+                      Create account
+                    </button>
+                  </form>
+                )}
+
+                <div className="auth-divider">
+                  <span>or</span>
+                </div>
+
                 <div className="auth-intro">
                   <strong>
                     {authMode === "login"
-                      ? "Use Google to sign in securely."
+                      ? "Use Google for a faster sign-in."
                       : "Create your account with Google in one step."}
                   </strong>
                   <p>
@@ -596,6 +677,13 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState("");
   const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [registerForm, setRegisterForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
 
   useEffect(() => {
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
@@ -617,13 +705,14 @@ export default function App() {
     const unsubscribe = subscribeToAuthChanges((firebaseUser) => {
       setSession((prev) => {
         if (!firebaseUser?.email) {
-          return null;
+          return prev?.authProvider === "google" ? null : prev;
         }
 
         const nextSession = {
           email: firebaseUser.email,
           name: firebaseUser.displayName || firebaseUser.email.split("@")[0],
           photoURL: firebaseUser.photoURL || "",
+          authProvider: "google",
         };
 
         if (
@@ -705,6 +794,69 @@ export default function App() {
         return typeof updater === "function" ? updater(user) : { ...user, ...updater };
       })
     );
+  };
+
+  const handleRegister = (event) => {
+    event.preventDefault();
+    setAuthError("");
+
+    const { name, email, password, confirmPassword } = registerForm;
+    if (!name || !email || !password || !confirmPassword) {
+      setAuthError("Please complete every registration field.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setAuthError("Passwords do not match.");
+      return;
+    }
+    if (users.some((user) => user.email.toLowerCase() === email.toLowerCase())) {
+      setAuthError("That email is already in use.");
+      return;
+    }
+
+    const createdUser = {
+      name,
+      email,
+      password,
+      createdAt: Date.now(),
+      authProvider: "local",
+      ...createUserProfile(),
+    };
+
+    setUsers((prev) => [...prev, createdUser]);
+    setSession({ email, name, authProvider: "local" });
+    setActiveTab("journey");
+    setRegisterForm({
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    });
+  };
+
+  const handleLogin = (event) => {
+    event.preventDefault();
+    setAuthError("");
+
+    const matchedUser = users.find(
+      (user) =>
+        user.email.toLowerCase() === loginForm.email.toLowerCase() &&
+        user.password === loginForm.password
+    );
+
+    if (!matchedUser) {
+      setAuthError("Invalid email or password.");
+      return;
+    }
+
+    setSession({
+      email: matchedUser.email,
+      name: matchedUser.name,
+      photoURL: matchedUser.photoURL || "",
+      authProvider: matchedUser.authProvider || "local",
+    });
+    setActiveTab("journey");
+    setLoginForm({ email: "", password: "" });
   };
 
   const handleGoogleAuth = async () => {
@@ -791,6 +943,12 @@ export default function App() {
       <PublicSection
         authMode={authMode}
         setAuthMode={setAuthMode}
+        loginForm={loginForm}
+        setLoginForm={setLoginForm}
+        registerForm={registerForm}
+        setRegisterForm={setRegisterForm}
+        onLogin={handleLogin}
+        onRegister={handleRegister}
         onGoogleAuth={handleGoogleAuth}
         authError={authError}
         authLoading={authLoading}
