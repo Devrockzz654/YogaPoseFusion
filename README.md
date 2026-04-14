@@ -96,7 +96,6 @@ YogaPoseFusion/
 ├── scripts/                     notebooks and helper scripts used during development
 ├── yoga-pose-fusion-frontend/   active React frontend
 ├── Dockerfile                   Docker build for backend deployment
-├── render.yaml                  legacy Render deployment config
 └── README.md                    project overview
 ```
 
@@ -188,7 +187,7 @@ Additional project documentation:
 - [`docs/API_DOCUMENTATION.md`](/Volumes/Dev/Project2/YogaPoseFusion/docs/API_DOCUMENTATION.md)
 - [`docs/SETUP_GUIDE.md`](/Volumes/Dev/Project2/YogaPoseFusion/docs/SETUP_GUIDE.md)
 - [`docs/DEMO_CHECKLIST.md`](/Volumes/Dev/Project2/YogaPoseFusion/docs/DEMO_CHECKLIST.md)
-- [`docs/DEPLOY_RENDER_CLOUDFLARE.md`](/Volumes/Dev/Project2/YogaPoseFusion/docs/DEPLOY_RENDER_CLOUDFLARE.md)
+- [`docs/DEPLOY_HUGGINGFACE_CLOUDFLARE.md`](/Volumes/Dev/Project2/YogaPoseFusion/docs/DEPLOY_HUGGINGFACE_CLOUDFLARE.md)
 
 ## Deployment
 
